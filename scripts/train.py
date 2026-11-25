@@ -33,67 +33,88 @@ MODEL_DIR = os.path.join(ROOT, 'models')
 # ── Synthetic data ────────────────────────────────────────────────────────────
 
 def generate_synthetic_data(n_samples: int = 10_000) -> pd.DataFrame:
-    """Generate UNSW-NB15-shaped synthetic data for smoke-testing the pipeline."""
+    """
+    Generate structured synthetic data with real signal so the model actually learns.
+    Normal: low rate/bytes, UDP, INT state.  Attack: high rate/bytes, TCP, FIN/RST state.
+    """
     rng = np.random.default_rng(42)
+    n   = n_samples
 
-    proto_cats   = ['udp', 'tcp', 'arp', 'ospf', 'icmp', 'igmp', 'sctp', 'unas']
-    service_cats = ['-', 'http', 'ftp', 'smtp', 'ssh', 'dns', 'ftp-data',
-                    'irc', 'pop3', 'snmp', 'ssl', 'dhcp', 'radius']
-    state_cats   = ['INT', 'FIN', 'CON', 'REQ', 'RST', 'URH', 'URN',
-                    'PAR', 'ECO', 'ECR', 'TST', 'MAS', 'TXD', 'URP', 'no']
-    attack_cats  = ['Generic', 'Exploits', 'Fuzzers', 'DoS',
-                    'Reconnaissance', 'Analysis', 'Backdoor', 'Shellcode', 'Worms']
+    attack_cats = ['Generic', 'Exploits', 'Fuzzers', 'DoS',
+                   'Reconnaissance', 'Analysis', 'Backdoor', 'Shellcode', 'Worms']
 
-    n       = n_samples
-    labels  = rng.choice([0, 1], n, p=[0.36, 0.64])
+    labels    = rng.choice([0, 1], n, p=[0.40, 0.60])
+    is_attack = labels == 1
+
+    proto   = np.where(is_attack, rng.choice(['tcp','tcp','tcp','udp','icmp'], n),
+                                  rng.choice(['udp','udp','udp','tcp','arp'], n))
+    service = np.where(is_attack, rng.choice(['http','ftp','ssh','smtp','-'], n),
+                                  rng.choice(['-','-','-','dns','http'], n))
+    state   = np.where(is_attack, rng.choice(['FIN','CON','RST','FIN','FIN'], n),
+                                  rng.choice(['INT','INT','INT','FIN','CON'], n))
+    rate    = np.where(is_attack, rng.uniform(200_000, 2_000_000, n),
+                                  rng.uniform(1_000, 50_000, n))
+    sbytes  = np.where(is_attack, rng.integers(2000, 50_000, n),  rng.integers(100, 1_500, n))
+    dbytes  = np.where(is_attack, rng.integers(1000, 30_000, n),  rng.integers(0, 500, n))
+    spkts   = np.where(is_attack, rng.integers(10, 200, n),       rng.integers(1, 5, n))
+    dpkts   = np.where(is_attack, rng.integers(5, 100, n),        rng.integers(0, 3, n))
+    sttl    = np.where(is_attack, rng.choice([62,63,29,30,0,125], n),
+                                  rng.choice([254,254,128,128,255], n))
+    dttl    = np.where(is_attack, rng.choice([252,62,0,125], n),
+                                  rng.choice([0,0,64,128], n))
+    sload   = rate * rng.uniform(0.8, 1.2, n)
+    dload   = np.where(is_attack, rate * rng.uniform(0.5, 1.0, n), np.zeros(n))
+    sjit    = np.where(is_attack, rng.uniform(0, 0.0001, n),   rng.uniform(0.001, 0.05, n))
+    djit    = np.where(is_attack, rng.uniform(0, 0.0001, n),   rng.uniform(0.001, 0.05, n))
+    ct_srv  = np.where(is_attack, rng.integers(8, 20, n),  rng.integers(1, 4, n))
     ttl_vals = [0, 29, 30, 62, 63, 64, 125, 126, 127, 128, 254, 255]
 
     df = pd.DataFrame({
         'id':               range(1, n + 1),
-        'dur':              rng.exponential(0.1, n),
-        'proto':            rng.choice(proto_cats, n),
-        'service':          rng.choice(service_cats, n),
-        'state':            rng.choice(state_cats, n),
-        'spkts':            rng.integers(1, 100, n),
-        'dpkts':            rng.integers(0, 100, n),
-        'sbytes':           rng.integers(100, 10_000, n),
-        'dbytes':           rng.integers(0, 10_000, n),
-        'rate':             rng.exponential(100_000, n),
-        'sttl':             rng.choice(ttl_vals, n),
-        'dttl':             rng.choice(ttl_vals, n),
-        'sload':            rng.exponential(1e6, n),
-        'dload':            rng.exponential(1e6, n),
-        'sloss':            rng.integers(0, 10, n),
-        'dloss':            rng.integers(0, 10, n),
+        'dur':              np.where(is_attack, rng.uniform(0.001, 0.5, n), rng.uniform(0.000005, 0.0001, n)),
+        'proto':            proto,
+        'service':          service,
+        'state':            state,
+        'spkts':            spkts,
+        'dpkts':            dpkts,
+        'sbytes':           sbytes,
+        'dbytes':           dbytes,
+        'rate':             rate,
+        'sttl':             sttl,
+        'dttl':             dttl,
+        'sload':            sload,
+        'dload':            dload,
+        'sloss':            rng.integers(0, 3, n),
+        'dloss':            rng.integers(0, 3, n),
         'sinpkt':           rng.exponential(0.01, n),
         'dinpkt':           rng.exponential(0.01, n),
-        'sjit':             rng.exponential(0.001, n),
-        'djit':             rng.exponential(0.001, n),
-        'swin':             rng.choice([0, 255, 1024, 2048, 4096, 8192, 65535], n),
+        'sjit':             sjit,
+        'djit':             djit,
+        'swin':             np.where(is_attack, rng.choice([255, 1024, 4096], n), rng.choice([0, 0, 255], n)),
         'stcpb':            rng.integers(0, 2**31, n),
         'dtcpb':            rng.integers(0, 2**31, n),
-        'dwin':             rng.choice([0, 255, 1024, 2048, 4096, 8192, 65535], n),
+        'dwin':             np.where(is_attack, rng.choice([255, 1024, 4096], n), rng.choice([0, 0, 255], n)),
         'tcprtt':           rng.exponential(0.001, n),
         'synack':           rng.exponential(0.001, n),
         'ackdat':           rng.exponential(0.001, n),
-        'smean':            rng.integers(28, 2000, n),
-        'dmean':            rng.integers(0, 2000, n),
-        'trans_depth':      rng.integers(0, 10, n),
-        'response_body_len':rng.integers(0, 10_000, n),
-        'ct_srv_src':       rng.integers(1, 20, n),
+        'smean':            np.where(is_attack, rng.integers(200, 1000, n), rng.integers(28, 300, n)),
+        'dmean':            np.where(is_attack, rng.integers(100, 800, n),  rng.integers(0, 100, n)),
+        'trans_depth':      np.where(is_attack, rng.integers(1, 8, n),      rng.integers(0, 1, n)),
+        'response_body_len':np.where(is_attack, rng.integers(500, 10_000, n), rng.integers(0, 100, n)),
+        'ct_srv_src':       ct_srv,
         'ct_state_ttl':     rng.integers(0, 6, n),
-        'ct_dst_ltm':       rng.integers(1, 20, n),
-        'ct_src_dport_ltm': rng.integers(1, 20, n),
-        'ct_dst_sport_ltm': rng.integers(1, 20, n),
-        'ct_dst_src_ltm':   rng.integers(1, 20, n),
-        'is_ftp_login':     rng.choice([0, 1], n, p=[0.98, 0.02]),
-        'ct_ftp_cmd':       rng.choice([0, 1, 2, 3, 4, 5], n, p=[0.95, 0.02, 0.01, 0.01, 0.005, 0.005]),
-        'ct_flw_http_mthd': rng.choice([0, 1, 2, 3, 4], n, p=[0.9, 0.05, 0.03, 0.01, 0.01]),
-        'ct_src_ltm':       rng.integers(1, 20, n),
-        'ct_srv_dst':       rng.integers(1, 20, n),
-        'is_sm_ips_ports':  rng.choice([0, 1], n, p=[0.99, 0.01]),
-        'attack_cat':       np.where(labels == 0, 'Normal',
-                                     rng.choice(attack_cats, n)),
+        'ct_dst_ltm':       np.where(is_attack, rng.integers(5, 20, n), rng.integers(1, 4, n)),
+        'ct_src_dport_ltm': rng.integers(1, 10, n),
+        'ct_dst_sport_ltm': rng.integers(1, 10, n),
+        'ct_dst_src_ltm':   ct_srv,
+        'is_ftp_login':     np.where(is_attack, rng.choice([0,1], n, p=[0.9,0.1]),
+                                     rng.choice([0,1], n, p=[0.99,0.01])),
+        'ct_ftp_cmd':       np.where(is_attack, rng.integers(0, 5, n), rng.integers(0, 1, n)),
+        'ct_flw_http_mthd': np.where(is_attack, rng.integers(1, 5, n), rng.integers(0, 1, n)),
+        'ct_src_ltm':       np.where(is_attack, rng.integers(5, 20, n), rng.integers(1, 4, n)),
+        'ct_srv_dst':       ct_srv,
+        'is_sm_ips_ports':  rng.choice([0, 1], n, p=[0.98, 0.02]),
+        'attack_cat':       np.where(labels == 0, 'Normal', rng.choice(attack_cats, n)),
         'label':            labels,
     })
     return df
