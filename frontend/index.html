@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Network IDS — UNSW-NB15</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --radius: 8px;
+      --mono: 'Courier New', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo { font-size: 1.4rem; }
+    h1 { font-size: 1.1rem; font-weight: 600; }
+    .badge {
+      margin-left: auto;
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    /* ── Layout ── */
+    main {
+      max-width: 960px;
+      margin: 32px auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 700px) { main { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .card-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* ── Form ── */
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 16px;
+    }
+    .field label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .field input, .field select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 0.85rem;
+      padding: 6px 8px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--accent);
+    }
+
+    .btn-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+    .btn {
+      padding: 8px 18px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 600;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+    .btn-attack { background: #3d1f1f; border: 1px solid #5a2020; color: var(--red); }
+
+    /* ── Result ── */
+    #result {
+      grid-column: 1 / -1;
+      display: none;
+    }
+    .result-inner {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .verdict {
+      font-size: 2rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .verdict.normal { color: var(--green); }
+    .verdict.attack { color: var(--red); }
+
+    .prob-bar-wrap { flex: 1; min-width: 200px; }
+    .prob-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .prob-bar {
+      height: 10px;
+      border-radius: 5px;
+      background: var(--border);
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .prob-fill { height: 100%; border-radius: 5px; transition: width .4s ease; }
+    .fill-normal { background: var(--green); }
+    .fill-attack { background: var(--red); }
+
+    .conf-chip {
+      font-size: 0.8rem;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+
+    /* ── Info box ── */
+    .info-row { display: flex; flex-direction: column; gap: 8px; }
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .info-item:last-child { border: none; }
+    .info-key { color: var(--muted); }
+    .info-val { color: var(--text); font-family: var(--mono); }
+
+    /* ── Error / spinner ── */
+    #error-box {
+      display: none;
+      grid-column: 1 / -1;
+      background: #2d1a1a;
+      border: 1px solid #5a2020;
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      color: var(--red);
+      font-size: 0.85rem;
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── About card ── */
+    .about-text { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+    .about-text a { color: var(--accent); text-decoration: none; }
+    .tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      margin: 2px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">🛡️</span>
+  <h1>Network Intrusion Detection System</h1>
+  <span class="badge">UNSW-NB15 · Random Forest</span>
+</header>
+
+<main>
+
+  <!-- Input card -->
+  <div class="card" style="grid-column: 1 / -1;">
+    <div class="card-title">Network Flow Features</div>
+    <div class="field-grid" id="feature-grid">
+      <!-- populated by JS -->
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="predict()">
+        Analyze Flow
+      </button>
+      <button class="btn btn-secondary" onclick="loadSample('normal')">
+        Sample: Normal
+      </button>
+      <button class="btn btn-attack" onclick="loadSample('attack')">
+        Sample: Attack
+      </button>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="error-box"></div>
+
+  <!-- Result -->
+  <div class="card" id="result">
+    <div class="card-title">Detection Result</div>
+    <div class="result-inner">
+      <div id="verdict" class="verdict"></div>
+      <div class="prob-bar-wrap">
+        <div class="prob-label"><span>Normal</span><span id="prob-normal-pct">—</span></div>
+        <div class="prob-bar"><div id="bar-normal" class="prob-fill fill-normal" style="width:0%"></div></div>
+        <div class="prob-label"><span>Attack</span><span id="prob-attack-pct">—</span></div>
+        <div class="prob-bar"><div id="bar-attack" class="prob-fill fill-attack" style="width:0%"></div></div>
+      </div>
+      <div id="conf-chip" class="conf-chip"></div>
+    </div>
+  </div>
+
+  <!-- Info card -->
+  <div class="card">
+    <div class="card-title">About the Model</div>
+    <div class="info-row">
+      <div class="info-item"><span class="info-key">Dataset</span><span class="info-val">UNSW-NB15</span></div>
+      <div class="info-item"><span class="info-key">Model</span><span class="info-val">Random Forest (100 trees)</span></div>
+      <div class="info-item"><span class="info-key">Features</span><span class="info-val">42 → VarianceThreshold</span></div>
+      <div class="info-item"><span class="info-key">Accuracy</span><span class="info-val">~95% (real data)</span></div>
+      <div class="info-item"><span class="info-key">F1-Score</span><span class="info-val">~0.96 (real data)</span></div>
+    </div>
+  </div>
+
+  <!-- About card -->
+  <div class="card">
+    <div class="card-title">About</div>
+    <p class="about-text">
+      This system classifies network flows as <strong style="color:var(--green)">Normal</strong>
+      or <strong style="color:var(--red)">Attack</strong> using a Random Forest
+      classifier trained on the
+      <a href="https://www.kaggle.com/datasets/mrwellsdavid/unsw-nb15" target="_blank">UNSW-NB15</a>
+      dataset — a modern benchmark for network intrusion detection containing
+      nine attack categories.
+    </p>
+    <br/>
+    <div>
+      <span class="tag">Generic</span>
+      <span class="tag">Exploits</span>
+      <span class="tag">Fuzzers</span>
+      <span class="tag">DoS</span>
+      <span class="tag">Reconnaissance</span>
+      <span class="tag">Analysis</span>
+      <span class="tag">Backdoor</span>
+      <span class="tag">Shellcode</span>
+      <span class="tag">Worms</span>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  const API = 'http://localhost:8000';
+
+  // ── Feature schema ──────────────────────────────────────────────────────────
+  const FIELDS = [
+    { key: 'dur',               label: 'Duration (s)',         type: 'number', step: '0.000001', def: 0.000011 },
+    { key: 'proto',             label: 'Protocol',             type: 'select', opts: ['udp','tcp','arp','ospf','icmp','igmp','sctp','unas'], def: 'udp' },
+    { key: 'service',           label: 'Service',              type: 'select', opts: ['-','http','ftp','smtp','ssh','dns','ftp-data','irc','pop3','snmp','ssl','dhcp','radius'], def: '-' },
+    { key: 'state',             label: 'State',                type: 'select', opts: ['INT','FIN','CON','REQ','RST','URH','URN','PAR','ECO','ECR','TST','MAS','TXD','URP','no'], def: 'INT' },
+    { key: 'spkts',             label: 'Src Packets',          type: 'number', step: '1',       def: 2 },
+    { key: 'dpkts',             label: 'Dst Packets',          type: 'number', step: '1',       def: 0 },
+    { key: 'sbytes',            label: 'Src Bytes',            type: 'number', step: '1',       def: 496 },
+    { key: 'dbytes',            label: 'Dst Bytes',            type: 'number', step: '1',       def: 0 },
+    { key: 'rate',              label: 'Packet Rate (pps)',    type: 'number', step: '0.01',    def: 90909.0 },
+    { key: 'sttl',              label: 'Src TTL',              type: 'number', step: '1',       def: 254 },
+    { key: 'dttl',              label: 'Dst TTL',              type: 'number', step: '1',       def: 0 },
+    { key: 'sload',             label: 'Src Load (bps)',       type: 'number', step: '0.1',     def: 0 },
+    { key: 'dload',             label: 'Dst Load (bps)',       type: 'number', step: '0.1',     def: 0 },
+    { key: 'sloss',             label: 'Src Loss',             type: 'number', step: '1',       def: 0 },
+    { key: 'dloss',             label: 'Dst Loss',             type: 'number', step: '1',       def: 0 },
+    { key: 'sinpkt',            label: 'Src Inter-pkt (ms)',   type: 'number', step: '0.001',   def: 0 },
+    { key: 'dinpkt',            label: 'Dst Inter-pkt (ms)',   type: 'number', step: '0.001',   def: 0 },
+    { key: 'sjit',              label: 'Src Jitter (ms)',      type: 'number', step: '0.001',   def: 0 },
+    { key: 'djit',              label: 'Dst Jitter (ms)',      type: 'number', step: '0.001',   def: 0 },
+    { key: 'swin',              label: 'Src Window',           type: 'number', step: '1',       def: 0 },
+    { key: 'dwin',              label: 'Dst Window',           type: 'number', step: '1',       def: 0 },
+    { key: 'stcpb',             label: 'Src TCP Base Seq',     type: 'number', step: '1',       def: 0 },
+    { key: 'dtcpb',             label: 'Dst TCP Base Seq',     type: 'number', step: '1',       def: 0 },
+    { key: 'tcprtt',            label: 'TCP RTT (s)',          type: 'number', step: '0.0001',  def: 0 },
+    { key: 'synack',            label: 'SYN→ACK (s)',          type: 'number', step: '0.0001',  def: 0 },
+    { key: 'ackdat',            label: 'ACK→Data (s)',         type: 'number', step: '0.0001',  def: 0 },
+    { key: 'smean',             label: 'Src Mean Pkt Size',    type: 'number', step: '1',       def: 248 },
+    { key: 'dmean',             label: 'Dst Mean Pkt Size',    type: 'number', step: '1',       def: 0 },
+    { key: 'trans_depth',       label: 'HTTP Depth',           type: 'number', step: '1',       def: 0 },
+    { key: 'response_body_len', label: 'HTTP Body Len',        type: 'number', step: '1',       def: 0 },
+    { key: 'ct_srv_src',        label: 'ct_srv_src',           type: 'number', step: '1',       def: 1 },
+    { key: 'ct_state_ttl',      label: 'ct_state_ttl',         type: 'number', step: '1',       def: 2 },
+    { key: 'ct_dst_ltm',        label: 'ct_dst_ltm',           type: 'number', step: '1',       def: 1 },
+    { key: 'ct_src_dport_ltm',  label: 'ct_src_dport_ltm',     type: 'number', step: '1',       def: 1 },
+    { key: 'ct_dst_sport_ltm',  label: 'ct_dst_sport_ltm',     type: 'number', step: '1',       def: 1 },
+    { key: 'ct_dst_src_ltm',    label: 'ct_dst_src_ltm',       type: 'number', step: '1',       def: 2 },
+    { key: 'is_ftp_login',      label: 'FTP Login (0/1)',      type: 'number', step: '1',       def: 0 },
+    { key: 'ct_ftp_cmd',        label: 'ct_ftp_cmd',           type: 'number', step: '1',       def: 0 },
+    { key: 'ct_flw_http_mthd',  label: 'ct_flw_http_mthd',    type: 'number', step: '1',       def: 0 },
+    { key: 'ct_src_ltm',        label: 'ct_src_ltm',           type: 'number', step: '1',       def: 1 },
+    { key: 'ct_srv_dst',        label: 'ct_srv_dst',           type: 'number', step: '1',       def: 2 },
+    { key: 'is_sm_ips_ports',   label: 'Same IPs/Ports (0/1)', type: 'number', step: '1',       def: 0 },
+  ];
+
+  // ── Build form ──────────────────────────────────────────────────────────────
+  function buildForm() {
+    const grid = document.getElementById('feature-grid');
+    FIELDS.forEach(f => {
+      const div = document.createElement('div');
+      div.className = 'field';
+      let input;
+      if (f.type === 'select') {
+        input = document.createElement('select');
+        input.id = f.key;
+        f.opts.forEach(o => {
+          const opt = document.createElement('option');
+          opt.value = opt.textContent = o;
+          if (o === f.def) opt.selected = true;
+          input.appendChild(opt);
+        });
+      } else {
+        input = document.createElement('input');
+        input.type = 'number';
+        input.step = f.step;
+        input.id = f.key;
+        input.value = f.def;
+      }
+      div.innerHTML = `<label for="${f.key}">${f.label}</label>`;
+      div.appendChild(input);
+      grid.appendChild(div);
+    });
+  }
+
+  function getPayload() {
+    const p = {};
+    FIELDS.forEach(f => {
+      const el = document.getElementById(f.key);
+      p[f.key] = f.type === 'select' ? el.value : Number(el.value);
+    });
+    return p;
+  }
+
+  function setPayload(data) {
+    FIELDS.forEach(f => {
+      const el = document.getElementById(f.key);
+      if (data[f.key] !== undefined) el.value = data[f.key];
+    });
+  }
+
+  // ── API calls ───────────────────────────────────────────────────────────────
+  async function loadSample(type) {
+    hideError();
+    document.getElementById('result').style.display = 'none';
+    try {
+      const res = await fetch(`${API}/sample/${type}`);
+      if (!res.ok) throw new Error(await res.text());
+      setPayload(await res.json());
+    } catch (e) {
+      showError(`Could not load sample: ${e.message}\nMake sure the backend is running (uvicorn backend.app:app --reload)`);
+    }
+  }
+
+  async function predict() {
+    hideError();
+    document.getElementById('result').style.display = 'none';
+
+    const btn = document.querySelector('.btn-primary');
+    const orig = btn.textContent;
+    btn.innerHTML = 'Analyzing <span class="spinner"></span>';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(`${API}/predict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(getPayload()),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || res.statusText);
+      }
+      showResult(await res.json());
+    } catch (e) {
+      showError(`Prediction failed: ${e.message}\n\nMake sure the backend is running:\n  uvicorn backend.app:app --reload\n\nAnd the model is trained:\n  python scripts/train.py`);
+    } finally {
+      btn.textContent = orig;
+      btn.disabled = false;
+    }
+  }
+
+  // ── UI helpers ──────────────────────────────────────────────────────────────
+  function showResult(data) {
+    const box = document.getElementById('result');
+    const v   = document.getElementById('verdict');
+    const pn  = data.probabilities.normal;
+    const pa  = data.probabilities.attack;
+
+    v.textContent = data.prediction === 1 ? '⚠️ Attack' : '✅ Normal';
+    v.className   = `verdict ${data.label.toLowerCase()}`;
+
+    document.getElementById('prob-normal-pct').textContent = `${(pn*100).toFixed(1)}%`;
+    document.getElementById('prob-attack-pct').textContent = `${(pa*100).toFixed(1)}%`;
+    document.getElementById('bar-normal').style.width = `${pn*100}%`;
+    document.getElementById('bar-attack').style.width = `${pa*100}%`;
+
+    const chip = document.getElementById('conf-chip');
+    chip.textContent = `Confidence: ${(data.confidence*100).toFixed(1)}%`;
+    chip.style.borderColor = data.prediction === 1 ? 'var(--red)' : 'var(--green)';
+    chip.style.color = data.prediction === 1 ? 'var(--red)' : 'var(--green)';
+
+    box.style.display = 'block';
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('error-box');
+    box.style.display = 'block';
+    box.innerHTML = `<strong>Error</strong><br/><pre style="margin-top:6px;font-size:0.78rem;white-space:pre-wrap">${msg}</pre>`;
+  }
+  function hideError() {
+    document.getElementById('error-box').style.display = 'none';
+  }
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+  buildForm();
+</script>
+</body>
+</html>
