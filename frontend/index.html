@@ -74,9 +74,10 @@
     /* ── Form ── */
     .field-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
       gap: 10px 16px;
     }
+    @media (max-width: 700px) { .field-grid { grid-template-columns: 1fr 1fr; } }
     .field label {
       display: block;
       font-size: 0.75rem;
@@ -216,20 +217,17 @@
 
   <!-- Input card -->
   <div class="card" style="grid-column: 1 / -1;">
-    <div class="card-title">Network Flow Features</div>
+    <div class="card-title">Network Flow — Enter Traffic Features</div>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:14px;">
+      Fill in the key fields or load a pre-built sample, then click <strong style="color:var(--text)">Analyze Flow</strong>.
+    </p>
     <div class="field-grid" id="feature-grid">
       <!-- populated by JS -->
     </div>
     <div class="btn-row">
-      <button class="btn btn-primary" onclick="predict()">
-        Analyze Flow
-      </button>
-      <button class="btn btn-secondary" onclick="loadSample('normal')">
-        Sample: Normal
-      </button>
-      <button class="btn btn-attack" onclick="loadSample('attack')">
-        Sample: Attack
-      </button>
+      <button class="btn btn-secondary" onclick="loadSample('normal')">⬇ Load Normal Sample</button>
+      <button class="btn btn-attack"    onclick="loadSample('attack')">⬇ Load Attack Sample</button>
+      <button class="btn btn-primary"   onclick="predict()">🔍 Analyze Flow</button>
     </div>
   </div>
 
@@ -293,51 +291,31 @@
 <script>
   const API = 'http://localhost:8000';
 
-  // ── Feature schema ──────────────────────────────────────────────────────────
+  // ── Visible fields (key 8 for the demo) ────────────────────────────────────
   const FIELDS = [
-    { key: 'dur',               label: 'Duration (s)',         type: 'number', step: '0.000001', def: 0.000011 },
-    { key: 'proto',             label: 'Protocol',             type: 'select', opts: ['udp','tcp','arp','ospf','icmp','igmp','sctp','unas'], def: 'udp' },
-    { key: 'service',           label: 'Service',              type: 'select', opts: ['-','http','ftp','smtp','ssh','dns','ftp-data','irc','pop3','snmp','ssl','dhcp','radius'], def: '-' },
-    { key: 'state',             label: 'State',                type: 'select', opts: ['INT','FIN','CON','REQ','RST','URH','URN','PAR','ECO','ECR','TST','MAS','TXD','URP','no'], def: 'INT' },
-    { key: 'spkts',             label: 'Src Packets',          type: 'number', step: '1',       def: 2 },
-    { key: 'dpkts',             label: 'Dst Packets',          type: 'number', step: '1',       def: 0 },
-    { key: 'sbytes',            label: 'Src Bytes',            type: 'number', step: '1',       def: 496 },
-    { key: 'dbytes',            label: 'Dst Bytes',            type: 'number', step: '1',       def: 0 },
-    { key: 'rate',              label: 'Packet Rate (pps)',    type: 'number', step: '0.01',    def: 90909.0 },
-    { key: 'sttl',              label: 'Src TTL',              type: 'number', step: '1',       def: 254 },
-    { key: 'dttl',              label: 'Dst TTL',              type: 'number', step: '1',       def: 0 },
-    { key: 'sload',             label: 'Src Load (bps)',       type: 'number', step: '0.1',     def: 0 },
-    { key: 'dload',             label: 'Dst Load (bps)',       type: 'number', step: '0.1',     def: 0 },
-    { key: 'sloss',             label: 'Src Loss',             type: 'number', step: '1',       def: 0 },
-    { key: 'dloss',             label: 'Dst Loss',             type: 'number', step: '1',       def: 0 },
-    { key: 'sinpkt',            label: 'Src Inter-pkt (ms)',   type: 'number', step: '0.001',   def: 0 },
-    { key: 'dinpkt',            label: 'Dst Inter-pkt (ms)',   type: 'number', step: '0.001',   def: 0 },
-    { key: 'sjit',              label: 'Src Jitter (ms)',      type: 'number', step: '0.001',   def: 0 },
-    { key: 'djit',              label: 'Dst Jitter (ms)',      type: 'number', step: '0.001',   def: 0 },
-    { key: 'swin',              label: 'Src Window',           type: 'number', step: '1',       def: 0 },
-    { key: 'dwin',              label: 'Dst Window',           type: 'number', step: '1',       def: 0 },
-    { key: 'stcpb',             label: 'Src TCP Base Seq',     type: 'number', step: '1',       def: 0 },
-    { key: 'dtcpb',             label: 'Dst TCP Base Seq',     type: 'number', step: '1',       def: 0 },
-    { key: 'tcprtt',            label: 'TCP RTT (s)',          type: 'number', step: '0.0001',  def: 0 },
-    { key: 'synack',            label: 'SYN→ACK (s)',          type: 'number', step: '0.0001',  def: 0 },
-    { key: 'ackdat',            label: 'ACK→Data (s)',         type: 'number', step: '0.0001',  def: 0 },
-    { key: 'smean',             label: 'Src Mean Pkt Size',    type: 'number', step: '1',       def: 248 },
-    { key: 'dmean',             label: 'Dst Mean Pkt Size',    type: 'number', step: '1',       def: 0 },
-    { key: 'trans_depth',       label: 'HTTP Depth',           type: 'number', step: '1',       def: 0 },
-    { key: 'response_body_len', label: 'HTTP Body Len',        type: 'number', step: '1',       def: 0 },
-    { key: 'ct_srv_src',        label: 'ct_srv_src',           type: 'number', step: '1',       def: 1 },
-    { key: 'ct_state_ttl',      label: 'ct_state_ttl',         type: 'number', step: '1',       def: 2 },
-    { key: 'ct_dst_ltm',        label: 'ct_dst_ltm',           type: 'number', step: '1',       def: 1 },
-    { key: 'ct_src_dport_ltm',  label: 'ct_src_dport_ltm',     type: 'number', step: '1',       def: 1 },
-    { key: 'ct_dst_sport_ltm',  label: 'ct_dst_sport_ltm',     type: 'number', step: '1',       def: 1 },
-    { key: 'ct_dst_src_ltm',    label: 'ct_dst_src_ltm',       type: 'number', step: '1',       def: 2 },
-    { key: 'is_ftp_login',      label: 'FTP Login (0/1)',      type: 'number', step: '1',       def: 0 },
-    { key: 'ct_ftp_cmd',        label: 'ct_ftp_cmd',           type: 'number', step: '1',       def: 0 },
-    { key: 'ct_flw_http_mthd',  label: 'ct_flw_http_mthd',    type: 'number', step: '1',       def: 0 },
-    { key: 'ct_src_ltm',        label: 'ct_src_ltm',           type: 'number', step: '1',       def: 1 },
-    { key: 'ct_srv_dst',        label: 'ct_srv_dst',           type: 'number', step: '1',       def: 2 },
-    { key: 'is_sm_ips_ports',   label: 'Same IPs/Ports (0/1)', type: 'number', step: '1',       def: 0 },
+    { key: 'proto',   label: 'Protocol',          type: 'select', opts: ['udp','tcp','arp','icmp','igmp','sctp','unas','ospf'], def: 'udp' },
+    { key: 'service', label: 'Service',            type: 'select', opts: ['-','http','ftp','smtp','ssh','dns','ssl','dhcp','radius'], def: '-' },
+    { key: 'state',   label: 'Connection State',   type: 'select', opts: ['INT','FIN','CON','REQ','RST'], def: 'INT' },
+    { key: 'dur',     label: 'Duration (s)',        type: 'number', step: '0.000001', def: 0.000011 },
+    { key: 'sbytes',  label: 'Src Bytes',           type: 'number', step: '1',        def: 496 },
+    { key: 'dbytes',  label: 'Dst Bytes',           type: 'number', step: '1',        def: 0 },
+    { key: 'rate',    label: 'Packet Rate (pps)',   type: 'number', step: '0.01',     def: 90909.0 },
+    { key: 'sttl',    label: 'Src TTL',             type: 'number', step: '1',        def: 254 },
   ];
+
+  // ── All 42 defaults sent silently with every request ─────────────────────
+  const DEFAULTS = {
+    dur: 0.000011, proto: 'udp', service: '-', state: 'INT',
+    spkts: 2, dpkts: 0, sbytes: 496, dbytes: 0,
+    rate: 90909.0, sttl: 254, dttl: 0, sload: 0.0, dload: 0.0,
+    sloss: 0, dloss: 0, sinpkt: 0.0, dinpkt: 0.0,
+    sjit: 0.0, djit: 0.0, swin: 0, stcpb: 0, dtcpb: 0, dwin: 0,
+    tcprtt: 0.0, synack: 0.0, ackdat: 0.0, smean: 248, dmean: 0,
+    trans_depth: 0, response_body_len: 0, ct_srv_src: 1, ct_state_ttl: 2,
+    ct_dst_ltm: 1, ct_src_dport_ltm: 1, ct_dst_sport_ltm: 1, ct_dst_src_ltm: 2,
+    is_ftp_login: 0, ct_ftp_cmd: 0, ct_flw_http_mthd: 0, ct_src_ltm: 1,
+    ct_srv_dst: 2, is_sm_ips_ports: 0,
+  };
 
   // ── Build form ──────────────────────────────────────────────────────────────
   function buildForm() {
@@ -369,7 +347,8 @@
   }
 
   function getPayload() {
-    const p = {};
+    // Start from defaults, then override with whatever the user changed
+    const p = { ...DEFAULTS };
     FIELDS.forEach(f => {
       const el = document.getElementById(f.key);
       p[f.key] = f.type === 'select' ? el.value : Number(el.value);
