@@ -172,36 +172,36 @@ def predict(features: NetworkFeatures):
 
 @app.get("/sample/normal", tags=["Samples"])
 def sample_normal():
-    """Return a sample normal-traffic payload ready to POST to /predict."""
+    """Real normal-traffic row from UNSW-NB15 test set (label=0)."""
     return {
-        "dur": 0.000011, "proto": "udp", "service": "-", "state": "INT",
-        "spkts": 2, "dpkts": 0, "sbytes": 496, "dbytes": 0,
-        "rate": 90909.0, "sttl": 254, "dttl": 0, "sload": 0.0, "dload": 0.0,
-        "sloss": 0, "dloss": 0, "sinpkt": 0.0, "dinpkt": 0.0,
-        "sjit": 0.0, "djit": 0.0, "swin": 0, "stcpb": 0, "dtcpb": 0, "dwin": 0,
-        "tcprtt": 0.0, "synack": 0.0, "ackdat": 0.0, "smean": 248, "dmean": 0,
+        "dur": 0.121478, "proto": "tcp", "service": "-", "state": "FIN",
+        "spkts": 6, "dpkts": 4, "sbytes": 258, "dbytes": 172,
+        "rate": 74.09, "sttl": 252, "dttl": 254, "sload": 14158.94, "dload": 8495.37,
+        "sloss": 0, "dloss": 0, "sinpkt": 24.2956, "dinpkt": 8.375,
+        "sjit": 30.177547, "djit": 11.830604, "swin": 255,
+        "stcpb": 621772692, "dtcpb": 2202533631, "dwin": 255,
+        "tcprtt": 0.0, "synack": 0.0, "ackdat": 0.0, "smean": 43, "dmean": 43,
         "trans_depth": 0, "response_body_len": 0, "ct_srv_src": 1,
-        "ct_state_ttl": 2, "ct_dst_ltm": 1, "ct_src_dport_ltm": 1,
-        "ct_dst_sport_ltm": 1, "ct_dst_src_ltm": 2, "is_ftp_login": 0,
+        "ct_state_ttl": 0, "ct_dst_ltm": 1, "ct_src_dport_ltm": 1,
+        "ct_dst_sport_ltm": 1, "ct_dst_src_ltm": 1, "is_ftp_login": 0,
         "ct_ftp_cmd": 0, "ct_flw_http_mthd": 0, "ct_src_ltm": 1,
-        "ct_srv_dst": 2, "is_sm_ips_ports": 0,
+        "ct_srv_dst": 1, "is_sm_ips_ports": 0,
     }
 
 
 @app.get("/sample/attack", tags=["Samples"])
 def sample_attack():
-    """Return a sample attack-traffic payload ready to POST to /predict."""
+    """Real attack-traffic row from UNSW-NB15 test set (label=1, Backdoor)."""
     return {
-        "dur": 0.021, "proto": "tcp", "service": "http", "state": "FIN",
-        "spkts": 12, "dpkts": 8, "sbytes": 2860, "dbytes": 2320,
-        "rate": 571428.57, "sttl": 62, "dttl": 252,
-        "sload": 1_088_761.9, "dload": 882_285.71,
-        "sloss": 0, "dloss": 0, "sinpkt": 1.909, "dinpkt": 2.625,
-        "sjit": 0.0, "djit": 0.0, "swin": 255, "stcpb": 42, "dtcpb": 42, "dwin": 255,
-        "tcprtt": 0.0, "synack": 0.0, "ackdat": 0.0, "smean": 238, "dmean": 290,
-        "trans_depth": 2, "response_body_len": 1543, "ct_srv_src": 10,
-        "ct_state_ttl": 2, "ct_dst_ltm": 10, "ct_src_dport_ltm": 1,
-        "ct_dst_sport_ltm": 1, "ct_dst_src_ltm": 10, "is_ftp_login": 0,
-        "ct_ftp_cmd": 0, "ct_flw_http_mthd": 2, "ct_src_ltm": 5,
-        "ct_srv_dst": 10, "is_sm_ips_ports": 0,
+        "dur": 0.009, "proto": "ddp", "service": "-", "state": "INT",
+        "spkts": 1, "dpkts": 0, "sbytes": 200, "dbytes": 0,
+        "rate": 111111.1, "sttl": 254, "dttl": 0, "sload": 177777.8, "dload": 0.0,
+        "sloss": 0, "dloss": 0, "sinpkt": 0.0, "dinpkt": 0.0,
+        "sjit": 0.0, "djit": 0.0, "swin": 0, "stcpb": 0, "dtcpb": 0, "dwin": 0,
+        "tcprtt": 0.0, "synack": 0.0, "ackdat": 0.0, "smean": 200, "dmean": 0,
+        "trans_depth": 0, "response_body_len": 0, "ct_srv_src": 7,
+        "ct_state_ttl": 2, "ct_dst_ltm": 7, "ct_src_dport_ltm": 1,
+        "ct_dst_sport_ltm": 1, "ct_dst_src_ltm": 7, "is_ftp_login": 0,
+        "ct_ftp_cmd": 0, "ct_flw_http_mthd": 0, "ct_src_ltm": 7,
+        "ct_srv_dst": 7, "is_sm_ips_ports": 0,
     }
